@@ -1,0 +1,299 @@
+{
+  "name": "Uptime Monitor & Daily Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutes": 5
+            }
+          ]
+        }
+      },
+      "id": "11111111-2222-3333-4444-555555555555",
+      "name": "Schedule Every 5m",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://demo.realworld.io",
+        "options": {
+          "continueOnFail": true,
+          "timeout": 10000
+        }
+      },
+      "id": "22222222-3333-4444-5555-666666666666",
+      "name": "Check Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.statusCode }}",
+              "operation": "equal",
+              "value2": 200
+            }
+          ]
+        }
+      },
+      "id": "33333333-4444-5555-6666-777777777777",
+      "name": "Is Online?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const responseTime = $node[\"Check Health\"].json.headers['x-response-time'] || 0; // Mocking response time if not present\nconst duration = $node[\"Check Health\"].pairedItem().metadata.runDuration || 0;\nreturn {\n  timestamp: new Date().toISOString(),\n  statusCode: $node[\"Check Health\"].json.statusCode || 0,\n  responseTimeMs: duration,\n  isHealthy: duration < 3000,\n  statusLabel: duration > 3000 ? \"slow\" : \"healthy\"\n};"
+      },
+      "id": "44444444-5555-6666-7777-888888888888",
+      "name": "Analyze Performance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$credentials.url}}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "discordWebhookApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=🚨 DOWNTIME ALERT: demo.realworld.io returned {{$json.statusCode}} at {{new Date().toISOString()}}"
+            }
+          ]
+        }
+      },
+      "id": "55555555-6666-7777-8888-999999999999",
+      "name": "Post Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        700,
+        400
+      ],
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "2",
+          "name": "Discord Webhook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/YOUR_SHEET_ID/values/Sheet1!A:D:append",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "values",
+              "value": "=[[$json.timestamp, $json.statusCode, $json.responseTimeMs, $json.isHealthy]]"
+            }
+          ]
+        },
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "valueInputOption",
+              "value": "RAW"
+            }
+          ]
+        }
+      },
+      "id": "66666666-7777-8888-9999-000000000000",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        950,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "3",
+          "name": "Google Sheets API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ new Date().getHours() }}",
+              "operation": "equal",
+              "value2": 9
+            }
+          ]
+        }
+      },
+      "id": "77777777-8888-9999-0000-111111111111",
+      "name": "Is 9 AM?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1150,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$credentials.url}}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "discordWebhookApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=📅 Daily Uptime Summary: demo.realworld.io is currently {{$node[\"Analyze Performance\"].json.statusLabel || 'Online'}}."
+            }
+          ]
+        }
+      },
+      "id": "88888888-9999-0000-1111-222222222222",
+      "name": "Daily Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1350,
+        300
+      ],
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "2",
+          "name": "Discord Webhook"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "99999999-0000-1111-2222-333333333333",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        1150,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Every 5m": {
+      "main": [
+        [
+          {
+            "node": "Check Health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Health": {
+      "main": [
+        [
+          {
+            "node": "Is Online?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Online?": {
+      "main": [
+        [
+          {
+            "node": "Analyze Performance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Performance": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Alert": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Is 9 AM?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is 9 AM?": {
+      "main": [
+        [
+          {
+            "node": "Daily Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
