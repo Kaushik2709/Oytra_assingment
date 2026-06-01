@@ -15,10 +15,7 @@
       "name": "Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [
-        100,
-        300
-      ]
+      "position": [100, 300]
     },
     {
       "parameters": {
@@ -53,10 +50,7 @@
       "name": "Fetch GitHub Repos",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [
-        300,
-        300
-      ],
+      "position": [300, 300],
       "credentials": {
         "githubApi": {
           "id": "1",
@@ -66,16 +60,13 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all()[0].json.items;\nconst top5 = items.slice(0, 5).map(repo => ({\n  name: repo.name,\n  full_name: repo.full_name,\n  description: repo.description,\n  stars: repo.stargazers_count,\n  url: repo.html_url,\n  language: repo.language\n}));\nreturn top5;"
+        "jsCode": "const items = $input.first().json.items || [];\nreturn items.slice(0, 5).map((repo) => ({\n  json: {\n    name: repo.name,\n    full_name: repo.full_name,\n    description: repo.description,\n    stars: repo.stargazers_count,\n    url: repo.html_url,\n    language: repo.language\n  }\n}));"
       },
       "id": "d3c7b1a0-7777-4d12-c7f1-8f9f098c9f80",
       "name": "Transform Repos",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        500,
-        300
-      ]
+      "position": [500, 300]
     },
     {
       "parameters": {
@@ -87,14 +78,12 @@
           "continueOnFail": true
         }
       },
+      "continueOnFail": true,
       "id": "c2b6a090-6666-4e12-d7f1-8f9f098c9f80",
       "name": "Enrich Top Repo",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [
-        700,
-        300
-      ],
+      "position": [700, 300],
       "credentials": {
         "githubApi": {
           "id": "1",
@@ -108,7 +97,7 @@
         "conditions": {
           "number": [
             {
-              "value1": "={{ $node[\"Transform Repos\"].json.stars }}",
+              "value1": "={{ $json.stars }}",
               "operation": "largerEqual",
               "value2": 1000
             }
@@ -119,28 +108,42 @@
       "name": "Check Popularity",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [
-        900,
-        300
-      ]
+      "position": [900, 300]
     },
     {
       "parameters": {
-        "jsCode": "const repos = $node[\"Transform Repos\"].all().map(r => r.json);\nconst readmeData = $node[\"Enrich Top Repo\"].json;\nconst isTrending = $node[\"Check Popularity\"].json.output === 'true';\n\nlet readmePreview = \"No preview available.\";\nif (readmeData && readmeData.content) {\n  const decoded = Buffer.from(readmeData.content, 'base64').toString('utf8');\n  readmePreview = decoded.substring(0, 300) + \"...\";\n}\n\nconst date = new Date().toLocaleDateString();\nconst label = isTrending ? \"🔥 Trending\" : \"📌 Notable\";\n\nlet digest = `📊 GitHub Morning Brief — ${date}\\n\\n`;\ndigest += `Status: ${label}\\n\\n`;\ndigest += \"Top 5 JavaScript Repos:\\n\";\n\nrepos.forEach((repo, index) => {\n  digest += `${index + 1}. **${repo.name}** (${repo.stars} stars) [${repo.language}]\\n   ${repo.description || 'No description'}\\n   ${repo.url}\\n\\n`;\n});\n\ndigest += `\\n📖 README Preview (${repos[0].name}):\\n${readmePreview}`;\n\nreturn { digest };"
+        "jsCode": "return [{ json: { label: '🔥 Trending' } }];"
+      },
+      "id": "4c71b8a0-5555-4f12-e7f1-8f9f098c9f80",
+      "name": "Label Trending",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { label: '📌 Notable' } }];"
+      },
+      "id": "5c71b8a0-5555-4f12-e7f1-8f9f098c9f80",
+      "name": "Label Notable",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "const repos = $node[\"Transform Repos\"].all().map((item) => item.json);\nconst readmeData = $node[\"Enrich Top Repo\"].json || {};\nconst label = $json.label || '📌 Notable';\n\nlet readmePreview = 'No preview available.';\nif (readmeData.content) {\n  const decoded = Buffer.from(readmeData.content, 'base64').toString('utf8');\n  readmePreview = decoded.substring(0, 300) + '...';\n}\n\nconst date = new Date().toLocaleDateString();\nlet digest = `📊 GitHub Morning Brief — ${date}\\n\\n`;\ndigest += `Status: ${label}\\n\\n`;\ndigest += 'Top 5 JavaScript Repos:\\n';\n\nrepos.forEach((repo, index) => {\n  digest += `${index + 1}. **${repo.name}** (${repo.stars} stars) [${repo.language}]\\n   ${repo.description || 'No description'}\\n   ${repo.url}\\n\\n`;\n});\n\ndigest += `\\n📖 README Preview (${repos[0]?.name || 'Top Repo'}):\\n${readmePreview}`;\n\nreturn [{ json: { digest } }];"
       },
       "id": "a0948070-4444-4012-f7f1-8f9f098c9f80",
       "name": "Format Digest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1150,
-        300
-      ]
+      "position": [1350, 300]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$credentials.url}}",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "discordWebhookApi",
         "sendBody": true,
@@ -148,7 +151,7 @@
           "parameters": [
             {
               "name": "content",
-              "value": "={{$json.digest}}"
+              "value": "={{ $json.digest }}"
             }
           ]
         },
@@ -158,10 +161,7 @@
       "name": "Send to Discord",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [
-        1350,
-        300
-      ],
+      "position": [1550, 300],
       "credentials": {
         "discordWebhookApi": {
           "id": "2",
@@ -175,15 +175,12 @@
       "name": "Error Trigger",
       "type": "n8n-nodes-base.errorTrigger",
       "typeVersion": 1,
-      "position": [
-        1150,
-        500
-      ]
+      "position": [1100, 520]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$credentials.url}}",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "discordWebhookApi",
         "sendBody": true,
@@ -191,7 +188,7 @@
           "parameters": [
             {
               "name": "content",
-              "value": "=⚠️ Morning Brief failed: {{$json.error.message}}"
+              "value": "={{ '⚠️ Morning Brief failed: ' + $json.error.message }}"
             }
           ]
         },
@@ -201,10 +198,7 @@
       "name": "Send Error to Discord",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [
-        1350,
-        500
-      ],
+      "position": [1350, 520],
       "credentials": {
         "discordWebhookApi": {
           "id": "2",
@@ -262,16 +256,38 @@
       "main": [
         [
           {
-            "node": "Format Digest",
+            "node": "Label Trending",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
+            "node": "Label Notable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Label Trending": {
+      "main": [
+        [
+          {
             "node": "Format Digest",
             "type": "main",
-            "index": 1
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Label Notable": {
+      "main": [
+        [
+          {
+            "node": "Format Digest",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
